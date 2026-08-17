@@ -1,0 +1,35 @@
+# UN Votes -> Israel Sympathy Analyzer configuration
+
+undl:
+  base_url: "https://digitallibrary.un.org"
+  # Collection restricting results to actual recorded-vote resolutions.
+  collection: "Voting Data"
+  # Free-text / subject query terms used to find Israel-related resolutions.
+  # Verify and adjust these against real UNDL subject headings during the
+  # first live probe (see README "Live probe" step) -- the exact controlled
+  # vocabulary could not be confirmed ahead of time because the site's WAF
+  # blocks unauthenticated read-only probing.
+  subject_keywords:
+    - "ISRAEL"
+    - "PALESTINE QUESTION"
+    - "MIDDLE EAST SITUATION"
+    - "OCCUPIED PALESTINIAN TERRITORY"
+  # Optional ISO date bounds (YYYY-MM-DD), null = no bound.
+  date_from: null
+  date_to: null
+  # Records fetched per search page.
+  page_size: 50
+  # Seconds to wait between paged requests (politeness / avoid re-triggering WAF).
+  request_delay_seconds: 1.5
+
+ollama:
+  host: "http://localhost:11434"
+  model: "llama3.1:8b"
+  temperature: 0.0
+  # Seconds to wait for a single classification response.
+  timeout_seconds: 120
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  output_dir: "data/output"
