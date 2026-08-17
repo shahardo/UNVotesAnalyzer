@@ -48,7 +48,7 @@ python run.py fetch --limit 20     # scrape UNDL, cache parsed resolutions to da
 python run.py classify             # classify newly-cached resolutions via Ollama
 python run.py score                # aggregate country scores to data/output/country_scores.csv
 python run.py all --limit 20       # run all three stages in sequence
-python run.py clean                # delete all cached JSON in data/raw/ and data/processed/
+python run.py clean                # delete all cached JSON in data/raw/, data/processed/, and data/output/
 ```
 
 Each stage is resumable/idempotent: `fetch` skips resolutions already
@@ -80,7 +80,11 @@ MARCXML (`of=xm`) instead and reads the resolution symbol from `791$a`,
 title from `245`, topic from `991$c`, vote date from `269$a`, and the
 per-country vote breakdown from repeated `967` fields (`$e`=country,
 `$d`=`Y`/`N`, and a *missing* `$d` meaning abstain). All of this was verified
-against live records, not assumed.
+against live records, not assumed. A record can carry more than one `791`
+field -- the resolution's own symbol in `$a`, plus a `$z`-only
+cross-reference to a related/superseded resolution -- so only an
+`$a`-bearing `791` may set the symbol; letting a later `$z`-only field
+overwrite it made ~20% of records silently fail to parse.
 
 ## Tests
 

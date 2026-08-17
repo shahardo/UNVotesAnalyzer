@@ -1,7 +1,9 @@
 import json
+
+import pytest
 from unittest.mock import MagicMock, patch
 
-from src.analysis.llm_classifier import classify_resolution
+from src.analysis.llm_classifier import classify_resolution, ensure_model_available
 from src.config import OllamaConfig
 from src.models import Direction, Resolution
 
@@ -73,3 +75,51 @@ def test_classify_falls_back_to_neutral_after_repeated_failures(mock_post):
     assert result.direction == Direction.NEUTRAL
     assert result.confidence == 0.0
     assert mock_post.call_count == 2
+
+
+def _mock_tags_response(model_names: list[str]):
+    mock = MagicMock()
+    mock.raise_for_status = MagicMock()
+    mock.json.return_value = {"models": [{"name": name} for name in model_names]}
+    return mock
+
+
+@patch("src.analysis.llm_classifier.requests.post")
+@patch("src.analysis.llm_classifier.requests.get")
+def test_ensure_model_available_skips_pull_when_present(mock_get, mock_post):
+    mock_get.return_value = _mock_tags_response(["llama3.1:8b", "gpt-oss:20b"])
+
+    ensure_model_available(CONFIG)
+
+    mock_post.assert_not_called()
+
+
+@patch("src.analysis.llm_classifier.requests.post")
+@patch("src.analysis.llm_classifier.requests.get")
+def test_ensure_model_available_pulls_when_missing(mock_get, mock_post):
+    mock_get.return_value = _mock_tags_response(["gpt-oss:20b"])
+    pull_response = MagicMock()
+    pull_response.raise_for_status = MagicMock()
+    pull_response.json.return_value = {"status": "success"}
+    mock_post.return_value = pull_response
+
+    ensure_model_available(CONFIG)
+
+    mock_post.assert_called_once_with(
+        f"{CONFIG.host}/api/pull",
+        json={"model": CONFIG.model, "stream": False},
+        timeout=None,
+    )
+
+
+@patch("src.analysis.llm_classifier.requests.post")
+@patch("src.analysis.llm_classifier.requests.get")
+def test_ensure_model_available_raises_when_pull_fails(mock_get, mock_post):
+    mock_get.return_value = _mock_tags_response([])
+    pull_response = MagicMock()
+    pull_response.raise_for_status = MagicMock()
+    pull_response.json.return_value = {"status": "error pulling model"}
+    mock_post.return_value = pull_response
+
+    with pytest.raises(RuntimeError):
+        ensure_model_available(CONFIG)

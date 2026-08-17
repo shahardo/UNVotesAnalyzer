@@ -89,7 +89,14 @@ def _parse_record(record: ET.Element) -> Resolution | None:
         if tag == "245":
             title_parts = [sf.text for sf in df.findall("m:subfield", _MARC_NS) if sf.text]
         elif tag == "791":
-            symbol = _datafield_subfield(df, "a")
+            # A record can carry more than one 791 field: the resolution's
+            # own symbol in $a, plus a $z cross-reference to a related/
+            # superseded resolution with no $a of its own. Only $a-bearing
+            # fields count -- an empty later 791 must not clobber a symbol
+            # already found.
+            field_symbol = _datafield_subfield(df, "a")
+            if field_symbol:
+                symbol = field_symbol
         elif tag == "991":
             topic = _datafield_subfield(df, "c")
             if topic:

@@ -7,7 +7,7 @@ import json
 import logging
 from pathlib import Path
 
-from src.analysis.llm_classifier import classify_resolution
+from src.analysis.llm_classifier import classify_resolution, ensure_model_available
 from src.analysis.scorer import score_countries
 from src.config import Config, load_config
 from src.fetch.undl_client import fetch_israel_resolutions, load_cached_resolutions
@@ -136,6 +136,9 @@ def cmd_classify(config: Config, args: argparse.Namespace) -> None:
     logger.info("%d resolutions cached, %d already classified, %d to classify",
                 len(resolutions), len(existing), len(to_classify))
 
+    if to_classify:
+        ensure_model_available(config.ollama)
+
     for resolution in resolutions:
         if resolution.symbol in existing:
             _log_classification(resolution, existing[resolution.symbol], cached=True)
@@ -155,13 +158,17 @@ def cmd_clean(config: Config, args: argparse.Namespace) -> None:
     for path in config.paths.raw_dir.glob("*.json"):
         path.unlink()
         removed += 1
-    for path in (_classifications_path(config), _results_path(config)):
+    for path in (
+        _classifications_path(config),
+        _results_path(config),
+        config.paths.output_dir / "country_scores.csv",
+    ):
         if path.exists():
             path.unlink()
             removed += 1
     logger.info(
-        "CLEAN removed %d cached JSON file(s) from %s and %s",
-        removed, config.paths.raw_dir, config.paths.processed_dir,
+        "CLEAN removed %d cached JSON file(s) from %s, %s and %s",
+        removed, config.paths.raw_dir, config.paths.processed_dir, config.paths.output_dir,
     )
 
 

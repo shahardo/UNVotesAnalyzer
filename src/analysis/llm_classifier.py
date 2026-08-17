@@ -51,6 +51,32 @@ def _extract_json(text: str) -> dict:
     return json.loads(match.group(0))
 
 
+def ensure_model_available(config: OllamaConfig) -> None:
+    """Pulls config.model if it isn't already present in Ollama.
+
+    A missing model makes every /api/generate call 404, which the retry/
+    fallback logic in classify_resolution quietly turns into an all-neutral
+    classification for every resolution instead of a visible error -- so
+    this check needs to run once up front, not be handled per-call."""
+    response = requests.get(f"{config.host}/api/tags", timeout=config.timeout_seconds)
+    response.raise_for_status()
+    local_models = {m["name"] for m in response.json().get("models", [])}
+    if config.model in local_models:
+        return
+
+    logger.warning("model %s not found in Ollama, pulling it now...", config.model)
+    pull_response = requests.post(
+        f"{config.host}/api/pull",
+        json={"model": config.model, "stream": False},
+        timeout=None,
+    )
+    pull_response.raise_for_status()
+    status = pull_response.json().get("status", "")
+    if status != "success":
+        raise RuntimeError(f"failed to pull model {config.model!r}: {status}")
+    logger.info("pulled model %s", config.model)
+
+
 def _call_ollama(config: OllamaConfig, prompt: str) -> str:
     response = requests.post(
         f"{config.host}/api/generate",
